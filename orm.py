@@ -115,6 +115,63 @@ class Manager(object):  # data mapper interface (generic repository) for models
         return True if cursor.fetchall() else False
 
 
+class QueryBuilder(object):
+
+    EQUAL = "="
+    NOT_EQUAL = "!="
+    AND = "AND"
+    OR = "OR"
+    ALL = "*"
+    LIMIT = "limit"
+
+    def __init__(self, model):
+        self.model = model
+        self.query_tokens = []
+
+    def filter(self, comparator=EQUAL, boolean=AND, **kwargs):
+        valid_keyvals = dict(i for i in vars(self.model).items() if i[0][0] is not '_')
+
+        for key, value in kwargs.items():
+            if key in valid_keyvals.keys():
+                self.query_tokens += [key] + [comparator] + [str(value)] + [boolean]
+            else:
+                raise(ValueError("Invalid column \"%s\"" % key))
+
+        if(len(self.query_tokens) > 0):
+            self.query_tokens = self.query_tokens[:-1]
+
+        return self
+
+    def limit(self, num):
+        self.query_tokens += [self.LIMIT] + [str(num)]
+
+        return self
+
+    def select(self, *args):
+        valid_keyvals = dict(i for i in vars(self.model).items() if i[0][0] is not '_')
+
+        columns = []
+        if(len(args)):
+            for value in args:
+                if value in valid_keyvals.keys():
+                    columns += [value]
+                else:
+                    raise(ValueError("Invalid column \"%s\"" % key))
+        else:
+            columns = self.ALL
+
+        sql = "select %s from %s where %s;"
+        cursor = self.model.db.execute(sql % (" ,".join(columns) if len(columns) > 1 else columns[0], self.model.__name__, " ".join(self.query_tokens))
+        return self.model.manager().create(**row) for row in cursor.fetchall())
+
+    def update(self, **kwargs):
+        pass
+
+    def delete(self):
+        sql = "delete from %s where %s"
+        cursor = self.model.db.execute(sql % (self.model.__name__, " ".join(self.query_tokens)))
+
+
 class Model(object):  # abstract entity model with an active record interface
 
     db = None
