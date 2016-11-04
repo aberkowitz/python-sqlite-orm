@@ -161,13 +161,30 @@ class QueryBuilder(object):
             columns = self.ALL
 
         sql = "select %s from %s where %s;"
-        cursor = self.model.db.execute(sql % (" ,".join(columns) if len(columns) > 1 else columns[0], self.model.__name__, " ".join(self.query_tokens))
-        return self.model.manager().create(**row) for row in cursor.fetchall())
+        cursor = self.model.db.execute(sql % (" ,".join(columns) if len(columns) > 1 else columns[0], self.model.__name__, " ".join(self.query_tokens)))
+        return (self.model.manager().create(**row) for row in cursor.fetchall())
 
     def update(self, **kwargs):
-        pass
+        valid_keyvals = dict(i for i in vars(self.model).items() if i[0][0] is not '_')
+
+        updates = []
+        if(len(kwargs)):
+            for key, value in kwargs.items():
+                if key in valid_keyvals.keys():
+                    updates += [[key] + ["="] + [str(value)]]
+                else:
+                    raise(ValueError("Updating invalid column \"%s\"" % key))
+            updatestr = (", ".join([" ".join(key) for key in updates]))
+        else:
+            raise(ValueError("Must update at least one column"))
+
+        sql = "UPDATE %s SET %s WHERE %s"
+        cursor = self.model.db.execute(sql % (self.model.__name__, updatestr, " ".join(self.query_tokens)))
+        self.model.db.commit()
 
     def delete(self):
+        valid_keyvals = dict(i for i in vars(self.model).items() if i[0][0] is not '_')
+
         sql = "delete from %s where %s"
         cursor = self.model.db.execute(sql % (self.model.__name__, " ".join(self.query_tokens)))
 
